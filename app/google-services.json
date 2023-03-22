@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "789476195687",
+    "project_id": "demstershaferthree",
+    "storage_bucket": "demstershaferthree.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:789476195687:android:60f525ae1b4a8f3e4f83c2",
+        "android_client_info": {
+          "package_name": "com.example.demstershaferthree"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "789476195687-31oepom17i1on41p4jveb0j937hvunu7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDA61jysMrm0j0NaNOk326ya9w7FMvLdFo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "789476195687-31oepom17i1on41p4jveb0j937hvunu7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
