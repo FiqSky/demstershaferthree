@@ -7,10 +7,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 class DiagnosisCalculator(private val databaseRef: DatabaseReference) {
 
+    @OptIn(DelicateCoroutinesApi::class)
     fun calculate(selectedGejala: List<String>, callback: DiagnosisListener) {
         // Inisialisasi variabel
         val daftarPenyakit = mutableListOf<String>()
@@ -68,66 +70,53 @@ class DiagnosisCalculator(private val databaseRef: DatabaseReference) {
     }
 
     // Fungsi untuk mendapatkan bobot gejala dari Firebase Realtime Database
-    private suspend fun getBobotGejala(namaGejala: String): Double = suspendCoroutine { continuation ->
-        databaseRef.child("GEJALA").orderByChild("gejala").equalTo(namaGejala)
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    var bobot = 0.0
-                    if (snapshot.exists()) {
-                        for (gejalaSnapshot in snapshot.children) {
-                            bobot = gejalaSnapshot.child("bobot").getValue(Double::class.java) ?: 0.0
-                        }
-                    }
-                    continuation.resume(bobot)
-                }
-
-                override fun onCancelled(error: DatabaseError) {
-                    continuation.resumeWithException(error.toException())
-                }
-            })
+    private suspend fun getBobotGejala(namaGejala: String): Double = withContext(Dispatchers.IO) {
+        val task = databaseRef.child("GEJALA").orderByChild("gejala").equalTo(namaGejala).get()
+        val snapshot = task.await()
+        var bobot = 0.0
+        if (snapshot.exists()) {
+            for (gejalaSnapshot in snapshot.children) {
+                bobot = gejalaSnapshot.child("bobot").getValue(Double::class.java) ?: 0.0
+            }
+        }
+        bobot
     }
 
     // Fungsi untuk mendapatkan kode gejala dari Firebase Realtime Database
-    private suspend fun getKodeGejala(namaGejala: String): String = suspendCoroutine { continuation ->
-        databaseRef.child("GEJALA").orderByChild("gejala").equalTo(namaGejala)
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    var kode = ""
-                    if (snapshot.exists()) {
-                        for (gejalaSnapshot in snapshot.children) {
-                            kode = gejalaSnapshot.child("kode_gejala").getValue(String::class.java) ?: ""
-                        }
-                    }
-                    continuation.resume(kode)
+    private suspend fun getKodeGejala(namaGejala: String): String {
+        return withContext(Dispatchers.IO) {
+            val dataSnapshot = databaseRef.child("GEJALA").orderByChild("gejala").equalTo(namaGejala).get().await()
+            var kode = ""
+            if (dataSnapshot.exists()) {
+                for (gejalaSnapshot in dataSnapshot.children) {
+                    kode = gejalaSnapshot.child("kode_gejala").getValue(String::class.java) ?: ""
                 }
-
-                override fun onCancelled(error: DatabaseError) {
-                    continuation.resumeWithException(error.toException())
-                }
-            })
-    }
-
-
-    // Fungsi untuk mendapatkan nama penyakit dari Firebase Realtime Database
-    suspend fun getNamaPenyakit(kodePenyakit: String): String {
-        return suspendCoroutine { continuation ->
-            databaseRef.child("PENYAKIT").orderByChild("kode_penyakit").equalTo(kodePenyakit)
-                .addListenerForSingleValueEvent(object : ValueEventListener {
-                    override fun onDataChange(snapshot: DataSnapshot) {
-                        if (snapshot.exists()) {
-                            for (penyakitSnapshot in snapshot.children) {
-                                val nama = penyakitSnapshot.child("nama_penyakit").getValue(String::class.java) ?: ""
-                                continuation.resume(nama)
-                            }
-                        } else {
-                            continuation.resumeWithException(Exception("Penyakit tidak ditemukan"))
-                        }
-                    }
-
-                    override fun onCancelled(error: DatabaseError) {
-                        continuation.resumeWithException(error.toException())
-                    }
-                })
+            }
+            kode
         }
     }
+
+    // Fungsi untuk mendapatkan nama penyakit dari Firebase Realtime Database
+    suspend fun getNamaPenyakit(kodePenyakit: String): String = withContext(Dispatchers.IO) {
+        val deferredNamaPenyakit = CompletableDeferred<String>()
+        val query = databaseRef.child("PENYAKIT").orderByChild("kode_penyakit").equalTo(kodePenyakit)
+        query.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) {
+                    for (penyakitSnapshot in snapshot.children) {
+                        val nama = penyakitSnapshot.child("nama_penyakit").getValue(String::class.java) ?: ""
+                        deferredNamaPenyakit.complete(nama)
+                    }
+                } else {
+                    deferredNamaPenyakit.completeExceptionally(Exception("Penyakit tidak ditemukan"))
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                deferredNamaPenyakit.completeExceptionally(error.toException())
+            }
+        })
+        deferredNamaPenyakit.await()
+    }
+
 }
