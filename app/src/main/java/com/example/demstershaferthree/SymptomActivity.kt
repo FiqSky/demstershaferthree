@@ -8,6 +8,9 @@ import android.widget.ArrayAdapter
 import android.widget.ListView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.database.*
 
 class SymptomActivity : AppCompatActivity(), DiagnosisListener {
@@ -17,36 +20,90 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener {
     private lateinit var gejalaList: MutableList<String>
     private lateinit var diagnosisCalculator: DiagnosisCalculator
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_symptom)
 
-        listView = findViewById(R.id.list_gejala)
-        databaseRef = FirebaseDatabase.getInstance().reference.child("GEJALA")
+        // set up RecyclerView
+        val recyclerViewGejala: RecyclerView = findViewById(R.id.recyclerViewGejala)
+        recyclerViewGejala.layoutManager = LinearLayoutManager(this)
         gejalaList = mutableListOf()
+        
         diagnosisCalculator = DiagnosisCalculator(databaseRef)
 
-        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_multiple_choice, gejalaList)
-        listView.choiceMode = ListView.CHOICE_MODE_MULTIPLE
-        listView.adapter = adapter
+        // get Firebase database reference
+        firebaseDatabase = FirebaseDatabase.getInstance()
+        databaseReference = firebaseDatabase.getReference("GEJALA")
 
-        fetchGejalaData()
-    }
+        // retrieve data from Firebase database
+        databaseReference.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(dataSnapshot: DataSnapshot) {
+                // clear existing data
+                gejalaList.clear()
 
-    private fun fetchGejalaData() {
-        databaseRef.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                for (gejalaSnapshot in snapshot.children) {
-                    val gejala = gejalaSnapshot.child("gejala").getValue(String::class.java)
-                    gejala?.let { gejalaList.add(it) }
+                // add new data
+                for (snapshot in dataSnapshot.children) {
+                    val kodeGejala = snapshot.child("kode_gejala").value.toString()
+                    val gejala = snapshot.child("gejala").value.toString()
+                    val bobot = snapshot.child("bobot").value.toString().toDouble()
+                    val gejalaObj = Gejala(kodeGejala, gejala, bobot, false)
+
+                    gejalaList.add(gejalaObj)
                 }
-                (listView.adapter as ArrayAdapter<*>).notifyDataSetChanged()
+
+                // update RecyclerView with new data
+                gejalaAdapter.notifyDataSetChanged()
             }
 
             override fun onCancelled(error: DatabaseError) {
-                // Handle database error
+                // handle error
             }
         })
+
+        // set up search button
+        val searchButton: Button = findViewById(R.id.searchButton)
+        searchButton.setOnClickListener {
+            val selectedGejalaList = getSelectedGejalaList()
+
+            if (selectedGejalaList.isNotEmpty()) {
+                val penyakitList = mutableListOf<Penyakit>()
+
+                // Retrieve data from Firebase database
+                val databaseReference = FirebaseDatabase.getInstance().getReference("PENYAKIT")
+                databaseReference.addListenerForSingleValueEvent(object : ValueEventListener {
+                    override fun onDataChange(dataSnapshot: DataSnapshot) {
+                        for (snapshot in dataSnapshot.children) {
+                            val kodePenyakit = snapshot.child("kode_penyakit").value.toString()
+                            val namaPenyakit = snapshot.child("nama_penyakit").value.toString()
+                            val daftarGejala = snapshot.child("daftar_gejala").value as List<String>
+
+                            // Calculate plausibility
+                            val plausibility = DempsterShaferCalculator.calculatePlausibility(selectedGejalaList, daftarGejala)
+
+                            val penyakit = Penyakit(kodePenyakit, namaPenyakit, plausibility)
+                            penyakitList.add(penyakit)
+                        }
+
+                        // Sort penyakitList by plausibility
+                        val sortedPenyakitList = penyakitList.sortedByDescending { it.plausibility }
+
+                        // Start ResultActivity with sortedPenyakitList as extra
+                        val intent = Intent(this@SymptomActivity, ResultActivity::class.java)
+                        intent.putExtra("penyakitList", sortedPenyakitList.toTypedArray())
+                        startActivity(intent)
+                    }
+
+                    override fun onCancelled(databaseError: DatabaseError) {
+                        // Handle error
+                    }
+                })
+            } else {
+                Toast.makeText(this, "Pilih setidaknya satu gejala", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+
     }
 
     fun onButtonClick(view: View) {
@@ -80,4 +137,16 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener {
         // Menampilkan error jika terjadi kesalahan pada perhitungan
         Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
     }
+
+    private fun getSelectedGejalaList(): List<String> {
+        val selectedGejalaList = mutableListOf<String>()
+        for (gejala in gejalaList) {
+            if (gejala.isSelected) {
+                selectedGejalaList.add(gejala.kodeGejala)
+            }
+        }
+        return selectedGejalaList
+    }
 }
+
+
