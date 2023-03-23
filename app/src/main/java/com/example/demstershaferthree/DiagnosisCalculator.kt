@@ -5,7 +5,8 @@ import android.util.Log
 import com.google.firebase.database.*
 
 class DiagnosisCalculator(private val databaseRef: DatabaseReference) {
-    fun calculate(selectedGejala: List<String>, listener: DiagnosisListener) {
+
+    fun calculate(selectedGejala: List<String>, callback: SymptomActivity) {
         // Inisialisasi variabel
         val daftarPenyakit = mutableListOf<String>()
         val daftarBelief = mutableMapOf<String, Double>()
@@ -44,14 +45,14 @@ class DiagnosisCalculator(private val databaseRef: DatabaseReference) {
                     daftarBeliefAkhir[kode_penyakit] = beliefAkhir
                 }
 
-                // Mengembalikan hasil diagnosis melalui listener
-                listener.onDiagnosisComplete(daftarBeliefAkhir)
+                // Memanggil callback listener dengan hasil diagnosis
+                callback.onDiagnosisComplete(daftarBeliefAkhir)
                 Log.d(TAG, "onDaftarBeliefAkhir: $daftarBeliefAkhir")
             }
 
             override fun onCancelled(error: DatabaseError) {
-                // Handle database error
-                listener.onDiagnosisError(error.message)
+                // Memanggil callback listener dengan error
+                callback.onDiagnosisError(error.message)
             }
         })
     }
