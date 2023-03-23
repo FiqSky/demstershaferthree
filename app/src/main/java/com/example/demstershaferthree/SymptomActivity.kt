@@ -12,8 +12,12 @@ import androidx.appcompat.widget.Toolbar
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.database.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
-class SymptomActivity : AppCompatActivity(), DiagnosisListener {
+class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope by MainScope() {
 
     private lateinit var listView: ListView
     private lateinit var databaseRef: DatabaseReference
@@ -106,7 +110,7 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener {
 
     }
 
-    fun onButtonClick(view: View) {
+    fun onButtonClick(view: View) = launch {
         val selectedGejala = mutableListOf<String>()
         val checkedItems = listView.checkedItemPositions
         for (i in 0 until checkedItems.size()) {
@@ -117,25 +121,34 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener {
             }
         }
 
-        diagnosisCalculator.calculate(selectedGejala, this)
+        diagnosisCalculator.calculate(selectedGejala, this@SymptomActivity)
     }
 
     override fun onDiagnosisComplete(daftarBeliefAkhir: Map<String, Double>) {
         // Menampilkan hasil diagnosis
-        var hasilDiagnosis = ""
-        for (kode_penyakit in daftarBeliefAkhir.keys) {
-            if (daftarBeliefAkhir[kode_penyakit]!! >= 0.5) {
-                hasilDiagnosis += "${diagnosisCalculator.getNamaPenyakit(kode_penyakit)} (${daftarBeliefAkhir[kode_penyakit]})\n"
-
+        launch {
+            var hasilDiagnosis = ""
+            for (kode_penyakit in daftarBeliefAkhir.keys) {
+                if (daftarBeliefAkhir[kode_penyakit]!! >= 0.5) {
+                    hasilDiagnosis += "${diagnosisCalculator.getNamaPenyakit(kode_penyakit)} (${daftarBeliefAkhir[kode_penyakit]})\n"
+                    Log.d(TAG, "onDiagnosisComplete1: $hasilDiagnosis")
+                }
             }
+            Toast.makeText(this@SymptomActivity, hasilDiagnosis, Toast.LENGTH_LONG).show()
+            Log.d(TAG, "onDiagnosisComplete2: $hasilDiagnosis")
         }
-        Toast.makeText(this, hasilDiagnosis, Toast.LENGTH_LONG).show()
-        Log.d(TAG, "onDiagnosisComplete: $hasilDiagnosis")
     }
 
     override fun onDiagnosisError(errorMessage: String?) {
         // Menampilkan error jika terjadi kesalahan pada perhitungan
-        Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
+        launch {
+            Toast.makeText(this@SymptomActivity, errorMessage, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        cancel() // cancel coroutine when activity is destroyed
     }
 
     private fun getSelectedGejalaList(): List<String> {
