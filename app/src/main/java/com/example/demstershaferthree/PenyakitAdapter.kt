@@ -1,5 +1,6 @@
 package com.example.demstershaferthree
 
+import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,22 +11,8 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 
-class PenyakitAdapter: RecyclerView.Adapter<PenyakitAdapter.ViewHolder>() {
-
-    private val databaseRef = FirebaseDatabase.getInstance().reference
-    private val penyakitList: MutableList<Penyakit> = mutableListOf()
-
-    inner class ViewHolder(itemView: View): RecyclerView.ViewHolder(itemView) {
-        private val kodePenyakit: TextView = itemView.findViewById(R.id.kode_penyakit)
-        private val namaPenyakit: TextView = itemView.findViewById(R.id.nama_penyakit)
-        private val daftarGejala: TextView = itemView.findViewById(R.id.daftar_gejala)
-
-        fun bind(penyakit: Penyakit) {
-            kodePenyakit.text = penyakit.kode_penyakit
-            namaPenyakit.text = penyakit.nama_penyakit
-            daftarGejala.text = penyakit.daftar_gejala.joinToString(", ")
-        }
-    }
+class PenyakitAdapter(private val penyakitList: List<Pair<Penyakit, Double>>) :
+    RecyclerView.Adapter<PenyakitAdapter.ViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_penyakit, parent, false)
@@ -33,34 +20,27 @@ class PenyakitAdapter: RecyclerView.Adapter<PenyakitAdapter.ViewHolder>() {
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val penyakit = penyakitList[position]
-        holder.bind(penyakit)
+        val penyakit = penyakitList[position].first
+        val belief = penyakitList[position].second
+        holder.bind(penyakit, belief)
     }
 
     override fun getItemCount(): Int {
         return penyakitList.size
     }
 
-    fun fetchPenyakitData() {
-        databaseRef.child("PENYAKIT").addValueEventListener(object: ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                for (penyakitSnapshot in snapshot.children) {
-                    val kode_penyakit = penyakitSnapshot.child("kode_penyakit").getValue(String::class.java)
-                    val nama_penyakit = penyakitSnapshot.child("nama_penyakit").getValue(String::class.java)
-                    val daftar_gejala = mutableListOf<String>()
-                    for (gejalaSnapshot in penyakitSnapshot.child("daftar_gejala").children) {
-                        val gejala = gejalaSnapshot.getValue(String::class.java)
-                        gejala?.let { daftar_gejala.add(it) }
-                    }
-                    val penyakit = Penyakit(kode_penyakit, nama_penyakit, daftar_gejala)
-                    penyakitList.add(penyakit)
-                }
-                notifyDataSetChanged()
-            }
+    inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val textViewNamaPenyakit: TextView = itemView.findViewById(R.id.textViewNamaPenyakit)
+        private val textViewBelief: TextView = itemView.findViewById(R.id.textViewBelief)
 
-            override fun onCancelled(error: DatabaseError) {
-                // Handle database error
+        fun bind(penyakit: Penyakit, belief: Double) {
+            val beliefPercentage = (belief * 100).toInt()
+            textViewNamaPenyakit.text = penyakit.namaPenyakit
+            textViewBelief.text = "Kepercayaan: $beliefPercentage%"
+
+            itemView.setOnClickListener {
+                // Lakukan sesuatu jika item penyakit di-klik
             }
-        })
+        }
     }
 }
