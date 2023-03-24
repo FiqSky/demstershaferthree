@@ -9,11 +9,15 @@ import android.widget.ArrayAdapter
 import android.widget.ListView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.room.Room
+import com.example.demstershaferthree.db.AppDatabase
+import com.example.demstershaferthree.model.Gejala
 import com.google.firebase.database.*
 import kotlinx.coroutines.*
 
 class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope by MainScope() {
 
+    private lateinit var db: AppDatabase
     private lateinit var listView: ListView
     private lateinit var databaseRef: DatabaseReference
     private lateinit var gejalaList: MutableList<String>
@@ -27,6 +31,7 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
         databaseRef = FirebaseDatabase.getInstance().reference.child("GEJALA")
         gejalaList = mutableListOf()
         diagnosisCalculator = DiagnosisCalculator(databaseRef)
+        db = Room.databaseBuilder(applicationContext, AppDatabase::class.java, "diagnosis_db").build()
 
         val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_multiple_choice, gejalaList)
         listView.choiceMode = ListView.CHOICE_MODE_MULTIPLE
@@ -36,11 +41,20 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
     }
 
     private fun fetchGejalaData() {
-        databaseRef.addValueEventListener(object : ValueEventListener {
+        databaseRef.child("GEJALA").addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 for (gejalaSnapshot in snapshot.children) {
+                    val kodeGejala = gejalaSnapshot.child("kode_gejala").getValue(String::class.java)
                     val gejala = gejalaSnapshot.child("gejala").getValue(String::class.java)
-                    gejala?.let { gejalaList.add(it) }
+                    val bobot = gejalaSnapshot.child("bobot").getValue(Double::class.java)
+
+                    if (kodeGejala != null && gejala != null && bobot != null) {
+                        val gejalaObj = Gejala(kodeGejala, gejala, bobot)
+                        gejalaList.add(gejala)
+                        launch(Dispatchers.IO) {
+                            db.gejalaDao().insertGejala(gejalaObj)
+                        }
+                    }
                 }
                 (listView.adapter as ArrayAdapter<*>).notifyDataSetChanged()
             }
@@ -50,6 +64,7 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
             }
         })
     }
+
 
     fun onButtonClick(view: View) {
         val selectedGejala = mutableListOf<String>()

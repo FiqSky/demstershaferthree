@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.example.demstershaferthree.model.Penyakit
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -21,9 +22,9 @@ class PenyakitAdapter: RecyclerView.Adapter<PenyakitAdapter.ViewHolder>() {
         private val daftarGejala: TextView = itemView.findViewById(R.id.daftar_gejala)
 
         fun bind(penyakit: Penyakit) {
-            kodePenyakit.text = penyakit.kode_penyakit
-            namaPenyakit.text = penyakit.nama_penyakit
-            daftarGejala.text = penyakit.daftar_gejala.joinToString(", ")
+            kodePenyakit.text = penyakit.kodePenyakit
+            namaPenyakit.text = penyakit.namaPenyakit
+            daftarGejala.text = penyakit.daftarGejala.joinToString(", ")
         }
     }
 
@@ -52,7 +53,7 @@ class PenyakitAdapter: RecyclerView.Adapter<PenyakitAdapter.ViewHolder>() {
                         val gejala = gejalaSnapshot.getValue(String::class.java)
                         gejala?.let { daftar_gejala.add(it) }
                     }
-                    val penyakit = Penyakit(kode_penyakit, nama_penyakit, daftar_gejala)
+                    val penyakit = Penyakit(kode_penyakit!!, nama_penyakit!!, daftar_gejala)
                     penyakitList.add(penyakit)
                 }
                 notifyDataSetChanged()
