@@ -1,6 +1,7 @@
 package com.example.demstershaferthree
 
 import android.content.ContentValues.TAG
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -9,10 +10,7 @@ import android.widget.ListView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.database.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 
 class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope by MainScope() {
 
@@ -53,7 +51,7 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
         })
     }
 
-    fun onButtonClick(view: View) = launch {
+    fun onButtonClick(view: View) {
         val selectedGejala = mutableListOf<String>()
         val checkedItems = listView.checkedItemPositions
         for (i in 0 until checkedItems.size()) {
@@ -64,8 +62,11 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
             }
         }
 
-        diagnosisCalculator.calculate(selectedGejala, this@SymptomActivity)
+        launch(Dispatchers.Main) {
+            diagnosisCalculator.calculate(selectedGejala, this@SymptomActivity)
+        }
     }
+
 
     override fun onDiagnosisComplete(daftarBeliefAkhir: Map<String, Double>) {
         // Menampilkan hasil diagnosis
@@ -77,10 +78,14 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
                     Log.d(TAG, "onDiagnosisComplete1: $hasilDiagnosis")
                 }
             }
-            Toast.makeText(this@SymptomActivity, hasilDiagnosis, Toast.LENGTH_LONG).show()
+
+            val intent = Intent(this@SymptomActivity, ResultActivity::class.java)
+            intent.putExtra("hasil_diagnosis", hasilDiagnosis)
+            startActivity(intent)
             Log.d(TAG, "onDiagnosisComplete2: $hasilDiagnosis")
         }
     }
+
 
     override fun onDiagnosisError(errorMessage: String?) {
         // Menampilkan error jika terjadi kesalahan pada perhitungan

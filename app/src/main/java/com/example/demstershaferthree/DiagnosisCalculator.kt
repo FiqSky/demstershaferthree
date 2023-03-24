@@ -10,10 +10,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
-class DiagnosisCalculator(private val databaseRef: DatabaseReference) {
-
-    @OptIn(DelicateCoroutinesApi::class)
+class DiagnosisCalculator(private val databaseRef: DatabaseReference) : CoroutineScope by MainScope() {
     fun calculate(selectedGejala: List<String>, callback: DiagnosisListener) {
+        Log.d(TAG, "calculateselectedGejala: $selectedGejala")
         // Inisialisasi variabel
         val daftarPenyakit = mutableListOf<String>()
         val daftarBelief = mutableMapOf<String, Double>()
@@ -21,10 +20,12 @@ class DiagnosisCalculator(private val databaseRef: DatabaseReference) {
         // Looping untuk mendapatkan daftar penyakit dan faktor keyakinannya
         databaseRef.child("PENYAKIT").addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                GlobalScope.launch {
+                launch {
                     snapshot.children.forEach { penyakitSnapshot ->
                         val kode_penyakit = penyakitSnapshot.child("kode_penyakit").getValue(String::class.java)
+                        Log.d(TAG, "onDataChange: $kode_penyakit")
                         val daftar_gejala = penyakitSnapshot.child("daftar_gejala").getValue(object : GenericTypeIndicator<List<String>>() {})
+                        Log.d(TAG, "onDataChange: $daftar_gejala")
                         var belief = 1.0
                         selectedGejala.forEach { gejala ->
                             val bobot = getBobotGejala(gejala)
@@ -34,6 +35,7 @@ class DiagnosisCalculator(private val databaseRef: DatabaseReference) {
                                 belief *= (1 - bobot)
                             }
                         }
+                        Log.d(TAG, "onDataChange: $daftarPenyakit")
                         daftarPenyakit.add(kode_penyakit!!)
                         daftarBelief[kode_penyakit] = belief
 
@@ -118,5 +120,4 @@ class DiagnosisCalculator(private val databaseRef: DatabaseReference) {
         })
         deferredNamaPenyakit.await()
     }
-
 }
