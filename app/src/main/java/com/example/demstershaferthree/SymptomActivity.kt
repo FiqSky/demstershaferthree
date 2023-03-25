@@ -19,6 +19,7 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
 
     private lateinit var db: AppDatabase
     private lateinit var listView: ListView
+    private var isCalculating: Boolean = false
     private lateinit var databaseRef: DatabaseReference
     private lateinit var gejalaList: MutableList<String>
     private lateinit var diagnosisCalculator: DiagnosisCalculator
@@ -71,6 +72,9 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
 
 
     fun onButtonClick(view: View) {
+        // Jika perhitungan sedang berjalan, jangan mulai perhitungan baru
+        if (isCalculating) return
+
         val selectedGejala = mutableListOf<String>()
         val checkedItems = listView.checkedItemPositions
         for (i in 0 until checkedItems.size()) {
@@ -81,13 +85,21 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
             }
         }
 
+        // Tandai bahwa perhitungan sedang berjalan
+        isCalculating = true
+
         launch(Dispatchers.Main) {
             diagnosisCalculator.calculate(selectedGejala, this@SymptomActivity)
         }
     }
 
 
+
     override fun onDiagnosisComplete(daftarBeliefAkhir: Map<String, Double>) {
+
+        // Menandai bahwa perhitungan telah selesai
+        isCalculating = false
+
         // Menampilkan hasil diagnosis
         launch {
             var hasilDiagnosis = ""
