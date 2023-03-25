@@ -28,10 +28,14 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
         setContentView(R.layout.activity_symptom)
 
         listView = findViewById(R.id.list_gejala)
-        databaseRef = FirebaseDatabase.getInstance().reference.child("GEJALA")
+//        databaseRef = FirebaseDatabase.getInstance().reference.child("GEJALA")
+        databaseRef = FirebaseDatabase.getInstance().reference
         gejalaList = mutableListOf()
         diagnosisCalculator = DiagnosisCalculator(databaseRef)
         db = Room.databaseBuilder(applicationContext, AppDatabase::class.java, "diagnosis_db").build()
+
+        // Menetapkan instance 'db' ke 'diagnosisCalculator'
+        diagnosisCalculator.db = db
 
         val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_multiple_choice, gejalaList)
         listView.choiceMode = ListView.CHOICE_MODE_MULTIPLE

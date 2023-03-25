@@ -11,8 +11,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
+@Suppress("NAME_SHADOWING")
 class DiagnosisCalculator(private val databaseRef: DatabaseReference) : CoroutineScope by MainScope() {
-    private lateinit var db: AppDatabase
+    lateinit var db: AppDatabase
     fun calculate(selectedGejala: List<String>, callback: DiagnosisListener) {
         Log.d(TAG, "calculateselectedGejala: $selectedGejala")
         // Inisialisasi variabel
