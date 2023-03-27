@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.room.Room
 import com.example.demstershaferthree.db.AppDatabase
 import com.example.demstershaferthree.model.Gejala
+import com.example.demstershaferthree.model.Penyakit
 import com.google.firebase.database.*
 import kotlinx.coroutines.*
 
@@ -43,8 +44,8 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
         listView.adapter = adapter
 
         fetchGejalaData()
+        fetchPenyakitData()
     }
-
     private fun fetchGejalaData() {
         databaseRef.child("GEJALA").addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -58,6 +59,31 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
                         gejalaList.add(gejala)
                         launch(Dispatchers.IO) {
                             db.gejalaDao().insertGejala(gejalaObj)
+                        }
+                    }
+                }
+                (listView.adapter as ArrayAdapter<*>).notifyDataSetChanged()
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                // Handle database error
+            }
+        })
+    }
+
+    private fun fetchPenyakitData() {
+        databaseRef.child("PENYAKIT").addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                for (gejalaSnapshot in snapshot.children) {
+                    val kodePenyakit = gejalaSnapshot.child("kode_penyakit").getValue(String::class.java)
+                    val namaPenyakit = gejalaSnapshot.child("nama_penyakit").getValue(String::class.java)
+                    val daftarGejala = gejalaSnapshot.child("daftar_gejala").getValue(object : GenericTypeIndicator<List<String>>() {})
+
+                    if (kodePenyakit != null && namaPenyakit != null && daftarGejala != null) {
+                        val penyakitObj = Penyakit(kodePenyakit, namaPenyakit, daftarGejala)
+                        gejalaList.add(namaPenyakit)
+                        launch(Dispatchers.IO) {
+                            db.penyakitDao().insertPenyakit(penyakitObj)
                         }
                     }
                 }
@@ -92,31 +118,28 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
             diagnosisCalculator.calculate(selectedGejala, this@SymptomActivity)
         }
     }
-
-
-
     override fun onDiagnosisComplete(daftarBeliefAkhir: Map<String, Double>) {
-
         // Menandai bahwa perhitungan telah selesai
         isCalculating = false
 
         // Menampilkan hasil diagnosis
         launch {
-            var hasilDiagnosis = ""
+            val hasilDiagnosisList = mutableListOf<String>()
             for (kode_penyakit in daftarBeliefAkhir.keys) {
                 if (daftarBeliefAkhir[kode_penyakit]!! >= 0.5) {
-                    hasilDiagnosis += "${diagnosisCalculator.getNamaPenyakit(kode_penyakit)} (${daftarBeliefAkhir[kode_penyakit]})\n"
-                    Log.d(TAG, "onDiagnosisComplete1: $hasilDiagnosis")
+                    val namaPenyakit = withContext(Dispatchers.IO) { diagnosisCalculator.getNamaPenyakit(kode_penyakit) }
+                    val belief = daftarBeliefAkhir[kode_penyakit]
+                    hasilDiagnosisList.add("$namaPenyakit (${belief})")
+                    Log.d(TAG, "onDiagnosisComplete1: $hasilDiagnosisList")
                 }
             }
 
             val intent = Intent(this@SymptomActivity, ResultActivity::class.java)
-            intent.putExtra("hasil_diagnosis", hasilDiagnosis)
+            intent.putExtra("hasil_diagnosis", hasilDiagnosisList.joinToString(separator = "\n"))
             startActivity(intent)
-            Log.d(TAG, "onDiagnosisComplete2: $hasilDiagnosis")
+            Log.d(TAG, "onDiagnosisComplete2: $hasilDiagnosisList")
         }
     }
-
 
     override fun onDiagnosisError(errorMessage: String?) {
         // Menampilkan error jika terjadi kesalahan pada perhitungan

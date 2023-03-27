@@ -1,13 +1,12 @@
 package com.example.demstershaferthree.model
 
-import androidx.room.ColumnInfo
-import androidx.room.Entity
-import androidx.room.PrimaryKey
-import androidx.room.TypeConverter
+import androidx.room.*
+import com.example.demstershaferthree.ListStringConverter
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
 @Entity(tableName = "penyakit")
+@TypeConverters(ListStringConverter::class)
 data class Penyakit(
     @PrimaryKey
     @ColumnInfo(name = "kode_penyakit") val kodePenyakit: String,
