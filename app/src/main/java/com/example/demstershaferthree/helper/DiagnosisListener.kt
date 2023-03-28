@@ -1,4 +1,4 @@
-package com.example.demstershaferthree
+package com.example.demstershaferthree.helper
 
 interface DiagnosisListener {
     fun onDiagnosisComplete(daftarBeliefAkhir: Map<String, Double>)

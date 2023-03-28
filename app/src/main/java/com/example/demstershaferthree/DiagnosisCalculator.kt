@@ -3,12 +3,11 @@ package com.example.demstershaferthree
 import android.content.ContentValues.TAG
 import android.util.Log
 import com.example.demstershaferthree.db.AppDatabase
+import com.example.demstershaferthree.helper.DiagnosisListener
 import com.google.firebase.database.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 @Suppress("NAME_SHADOWING")
@@ -53,8 +52,11 @@ class DiagnosisCalculator(private val databaseRef: DatabaseReference) : Coroutin
                             // Menghitung faktor keyakinan akhir
                             val daftarBeliefAkhir = mutableMapOf<String, Double>()
                             daftarPenyakit.forEach { kode_penyakit ->
-                                val beliefAkhir = daftarBelief[kode_penyakit]!! / (beliefTotal - daftarBelief[kode_penyakit]!!)
-                                daftarBeliefAkhir[kode_penyakit] = beliefAkhir
+                                val denominator = beliefTotal - daftarBelief[kode_penyakit]!!
+                                if (denominator != 0.0) {
+                                    val beliefAkhir = daftarBelief[kode_penyakit]!! / denominator
+                                    daftarBeliefAkhir[kode_penyakit] = beliefAkhir
+                                }
                             }
 
                             // Memanggil callback listener dengan hasil diagnosis

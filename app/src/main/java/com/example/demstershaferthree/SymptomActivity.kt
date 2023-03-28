@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.room.Room
 import com.example.demstershaferthree.db.AppDatabase
+import com.example.demstershaferthree.helper.DiagnosisListener
 import com.example.demstershaferthree.model.Gejala
 import com.example.demstershaferthree.model.Penyakit
 import com.google.firebase.database.*
@@ -30,7 +31,6 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
         setContentView(R.layout.activity_symptom)
 
         listView = findViewById(R.id.list_gejala)
-//        databaseRef = FirebaseDatabase.getInstance().reference.child("GEJALA")
         databaseRef = FirebaseDatabase.getInstance().reference
         gejalaList = mutableListOf()
         diagnosisCalculator = DiagnosisCalculator(databaseRef)
@@ -81,7 +81,6 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
 
                     if (kodePenyakit != null && namaPenyakit != null && daftarGejala != null) {
                         val penyakitObj = Penyakit(kodePenyakit, namaPenyakit, daftarGejala)
-                        gejalaList.add(namaPenyakit)
                         launch(Dispatchers.IO) {
                             db.penyakitDao().insertPenyakit(penyakitObj)
                         }

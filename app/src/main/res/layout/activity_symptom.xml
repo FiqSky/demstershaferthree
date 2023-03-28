@@ -13,20 +13,21 @@
         android:text="Pilih gejala yang Anda alami:"
         android:textSize="18sp" />
 
-    <ListView
-        android:id="@+id/list_gejala"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/text_gejala" />
-
     <Button
         android:id="@+id/button_submit"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_below="@id/list_gejala"
+        android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
         android:layout_marginTop="16dp"
         android:text="Submit"
         android:onClick="onButtonClick" />
+
+    <ListView
+        android:id="@+id/list_gejala"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/text_gejala"
+        android:layout_above="@id/button_submit" />
 
 </RelativeLayout>
