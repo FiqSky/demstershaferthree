@@ -125,7 +125,7 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
         launch {
             val hasilDiagnosisList = mutableListOf<String>()
             for (kode_penyakit in daftarBeliefAkhir.keys) {
-                if (daftarBeliefAkhir[kode_penyakit]!! >= 0.5) {
+                if (daftarBeliefAkhir[kode_penyakit]!! >= 0) {
                     val namaPenyakit = withContext(Dispatchers.IO) { diagnosisCalculator.getNamaPenyakit(kode_penyakit) }
                     val belief = daftarBeliefAkhir[kode_penyakit]
                     hasilDiagnosisList.add("$namaPenyakit (${belief})")

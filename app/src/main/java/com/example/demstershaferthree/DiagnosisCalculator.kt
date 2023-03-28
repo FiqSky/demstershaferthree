@@ -10,62 +10,42 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@Suppress("NAME_SHADOWING")
 class DiagnosisCalculator(private val databaseRef: DatabaseReference) : CoroutineScope by MainScope() {
     lateinit var db: AppDatabase
+
     fun calculate(selectedGejala: List<String>, callback: DiagnosisListener) {
         Log.d(TAG, "calculateselectedGejala: $selectedGejala")
-        // Inisialisasi variabel
         val daftarPenyakit = mutableListOf<String>()
-        val daftarBelief = mutableMapOf<String, Double>()
 
-        // Looping untuk mendapatkan daftar penyakit dan faktor keyakinannya
         databaseRef.child("PENYAKIT").addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 launch {
                     snapshot.children.forEach { penyakitSnapshot ->
                         val kode_penyakit = penyakitSnapshot.child("kode_penyakit").getValue(String::class.java)
                         Log.d(TAG, "onDataChange: $kode_penyakit")
-                        val daftar_gejala = penyakitSnapshot.child("daftar_gejala").getValue(object : GenericTypeIndicator<List<String>>() {})
-                        Log.d(TAG, "onDataChange: $daftar_gejala")
-                        var belief = 1.0
-                        selectedGejala.forEach { gejala ->
-                            val bobot = getBobotGejala(gejala)
-                            if (daftar_gejala?.contains(getKodeGejala(gejala)) == true) {
-                                belief *= bobot
-                            } else {
-                                belief *= (1 - bobot)
-                            }
-                        }
-                        Log.d(TAG, "onDataChange: $daftarPenyakit")
                         daftarPenyakit.add(kode_penyakit!!)
-                        daftarBelief[kode_penyakit] = belief
-
-                        // Check if all beliefs have been calculated
-                        if (daftarBelief.size == daftarPenyakit.size) {
-                            // Menghitung faktor keyakinan total
-                            var beliefTotal = 0.0
-                            daftarBelief.values.forEach { belief ->
-                                beliefTotal += belief
-                            }
-
-                            // Menghitung faktor keyakinan akhir
-                            val daftarBeliefAkhir = mutableMapOf<String, Double>()
-                            daftarPenyakit.forEach { kode_penyakit ->
-                                val denominator = beliefTotal - daftarBelief[kode_penyakit]!!
-                                if (denominator != 0.0) {
-                                    val beliefAkhir = daftarBelief[kode_penyakit]!! / denominator
-                                    daftarBeliefAkhir[kode_penyakit] = beliefAkhir
-                                }
-                            }
-
-                            // Memanggil callback listener dengan hasil diagnosis
-                            withContext(Dispatchers.Main) {
-                                callback.onDiagnosisComplete(daftarBeliefAkhir)
-                            }
-                            Log.d(TAG, "onDaftarBeliefAkhir: $daftarBeliefAkhir")
-                        }
                     }
+
+                    // Langkah 2: Buat mass functions awal untuk setiap penyakit
+                    val dempsterShafer = DempsterShafer()
+                    val gejalaMassFunctionsList = mutableListOf<Map<String, Double>>()
+                    selectedGejala.forEach { gejala ->
+                        val bobot = getBobotGejala(gejala)
+                        val gejalaMassFunctions = getGejalaMassFunctions(gejala, bobot)
+                        gejalaMassFunctionsList.add(gejalaMassFunctions)
+                    }
+
+                    // Langkah 3: Gunakan aturan kombinasi Dempster-Shafer untuk menggabungkan mass functions
+                    var combinedMassFunctions = dempsterShafer.initializeMassFunctions(daftarPenyakit)
+                    gejalaMassFunctionsList.forEach { gejalaMassFunctions ->
+                        combinedMassFunctions = dempsterShafer.combineMassFunctions(combinedMassFunctions, gejalaMassFunctions)
+                    }
+
+                    // Memanggil callback listener dengan hasil diagnosis
+                    withContext(Dispatchers.Main) {
+                        callback.onDiagnosisComplete(combinedMassFunctions)
+                    }
+                    Log.d(TAG, "onDaftarBeliefAkhir: $combinedMassFunctions")
                 }
             }
 
@@ -74,6 +54,14 @@ class DiagnosisCalculator(private val databaseRef: DatabaseReference) : Coroutin
                 callback.onDiagnosisError(error.message)
             }
         })
+    }
+
+    // Fungsi untuk mendapatkan mass functions gejala
+    private fun getGejalaMassFunctions(gejala: String, bobot: Double): Map<String, Double> {
+        val massFunctions = mutableMapOf<String, Double>()
+        massFunctions[gejala] = bobot
+        massFunctions[""] = 1 - bobot // Himpunan kosong
+        return massFunctions
     }
 
     // Fungsi untuk mendapatkan bobot gejala dari Firebase Realtime Database
