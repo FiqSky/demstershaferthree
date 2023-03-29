@@ -1,6 +1,6 @@
 package com.example.demstershaferthree.helper
 
 interface DiagnosisListener {
-    fun onDiagnosisComplete(daftarBeliefAkhir: Map<String, Double>)
+    fun onDiagnosisComplete(namaPenyakit: String, beliefValue: Double)
     fun onDiagnosisError(errorMessage: String?)
 }

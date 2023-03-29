@@ -49,9 +49,12 @@ class DiagnosisCalculator(private val databaseRef: DatabaseReference) : Coroutin
                         Log.d(TAG, "onDataChange - CheckCombinedMassFunctionsAfterCombination: $combinedMassFunctions")
                     }
 
+                    // Menemukan penyakit dengan nilai belief tertinggi
+                    val (namaPenyakitTerbaik, beliefTerbaik) = getBestDiagnosisResult(daftarPenyakit, combinedMassFunctions)
+
                     // Memanggil callback listener dengan hasil diagnosis
                     withContext(Dispatchers.Main) {
-                        callback.onDiagnosisComplete(combinedMassFunctions)
+                        callback.onDiagnosisComplete(namaPenyakitTerbaik, beliefTerbaik)
                     }
                     Log.d(TAG, "onDaftarBeliefAkhir: $combinedMassFunctions")
                 }
@@ -70,6 +73,22 @@ class DiagnosisCalculator(private val databaseRef: DatabaseReference) : Coroutin
         massFunctions[gejala] = bobot
         massFunctions[""] = 1 - bobot // Himpunan kosong
         return massFunctions
+    }
+
+    // Fungsi untuk mendapatkan hasil diagnosis terbaik (penyakit dengan belief tertinggi)
+    private suspend fun getBestDiagnosisResult(daftarPenyakit: List<String>, combinedMassFunctions: Map<String, Double>): Pair<String, Double> {
+        var namaPenyakitTerbaik = ""
+        var beliefTerbaik = -1.0
+
+        for (kodePenyakit in daftarPenyakit) {
+            val belief = combinedMassFunctions[kodePenyakit] ?: 0.0
+            if (belief > beliefTerbaik) {
+                beliefTerbaik = belief
+                namaPenyakitTerbaik = getNamaPenyakit(kodePenyakit)
+            }
+        }
+
+        return namaPenyakitTerbaik to beliefTerbaik
     }
 
     // Fungsi untuk mendapatkan bobot gejala dari Firebase Realtime Database

@@ -25,6 +25,8 @@ class DempsterShafer {
                 if (intersection.isNotEmpty()) {
                     val newValue = (value1 * value2) / normalizationFactor
                     combinedMassFunctions[intersection] = combinedMassFunctions.getOrDefault(intersection, 0.0) + newValue
+                } else {
+                    combinedMassFunctions[""] = combinedMassFunctions.getOrDefault("", 0.0) + (value1 * value2)
                 }
             }
         }

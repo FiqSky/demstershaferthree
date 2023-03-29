@@ -117,21 +117,16 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
             diagnosisCalculator.calculate(selectedGejala, this@SymptomActivity)
         }
     }
-    override fun onDiagnosisComplete(daftarBeliefAkhir: Map<String, Double>) {
+    override fun onDiagnosisComplete(namaPenyakit: String, beliefValue: Double) {
         // Menandai bahwa perhitungan telah selesai
         isCalculating = false
 
         // Menampilkan hasil diagnosis
         launch {
             val hasilDiagnosisList = mutableListOf<String>()
-            for (kode_penyakit in daftarBeliefAkhir.keys) {
-                if (daftarBeliefAkhir[kode_penyakit]!! >= 0) {
-                    val namaPenyakit = withContext(Dispatchers.IO) { diagnosisCalculator.getNamaPenyakit(kode_penyakit) }
-                    val belief = daftarBeliefAkhir[kode_penyakit]
-                    hasilDiagnosisList.add("$namaPenyakit (${belief})")
-                    Log.d(TAG, "onDiagnosisComplete1: $hasilDiagnosisList")
-                }
-            }
+
+            hasilDiagnosisList.add("$namaPenyakit (${beliefValue})")
+            Log.d(TAG, "onDiagnosisComplete1: $hasilDiagnosisList")
 
             val intent = Intent(this@SymptomActivity, ResultActivity::class.java)
             intent.putExtra("hasil_diagnosis", hasilDiagnosisList.joinToString(separator = "\n"))
