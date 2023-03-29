@@ -31,14 +31,22 @@ class DiagnosisCalculator(private val databaseRef: DatabaseReference) : Coroutin
                     val gejalaMassFunctionsList = mutableListOf<Map<String, Double>>()
                     selectedGejala.forEach { gejala ->
                         val bobot = getBobotGejala(gejala)
-                        val gejalaMassFunctions = getGejalaMassFunctions(gejala, bobot)
+                        Log.d(TAG, "onDataChange - CheckBobot: $bobot")
+                        val kodeGejala = getKodeGejala(gejala)
+                        val gejalaMassFunctions = getGejalaMassFunctions(kodeGejala, bobot)
+                        Log.d(TAG, "onDataChange - CheckGejalaMassFunctions: $gejalaMassFunctions")
                         gejalaMassFunctionsList.add(gejalaMassFunctions)
+                        Log.d(TAG, "onDataChange - CheckGejalaMassFunctionsList: $gejalaMassFunctionsList")
                     }
 
                     // Langkah 3: Gunakan aturan kombinasi Dempster-Shafer untuk menggabungkan mass functions
-                    var combinedMassFunctions = dempsterShafer.initializeMassFunctions(daftarPenyakit)
+                    var combinedMassFunctions = dempsterShafer.initializeMassFunctions(selectedGejala)
+                    Log.d(TAG, "onDataChange - CheckSelectedGejala: $selectedGejala")
+                    Log.d(TAG, "onDataChange - CheckDaftarPenyakit: $daftarPenyakit")
                     gejalaMassFunctionsList.forEach { gejalaMassFunctions ->
-                        combinedMassFunctions = dempsterShafer.combineMassFunctions(combinedMassFunctions, gejalaMassFunctions)
+                        Log.d(TAG, "onDataChange - CheckGejalaMassFunctions: $gejalaMassFunctions")
+                        combinedMassFunctions = dempsterShafer.combineMassFunctions(daftarPenyakit, combinedMassFunctions, gejalaMassFunctions)
+                        Log.d(TAG, "onDataChange - CheckCombinedMassFunctionsAfterCombination: $combinedMassFunctions")
                     }
 
                     // Memanggil callback listener dengan hasil diagnosis
