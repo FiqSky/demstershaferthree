@@ -1,6 +1,7 @@
 package com.example.demstershaferthree
 
 import android.content.ContentValues.TAG
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -8,15 +9,19 @@ import android.widget.ArrayAdapter
 import android.widget.ListView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.room.Room
+import com.example.demstershaferthree.db.AppDatabase
+import com.example.demstershaferthree.helper.DiagnosisListener
+import com.example.demstershaferthree.model.Gejala
+import com.example.demstershaferthree.model.Penyakit
 import com.google.firebase.database.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 
 class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope by MainScope() {
 
+    private lateinit var db: AppDatabase
     private lateinit var listView: ListView
+    private var isCalculating: Boolean = false
     private lateinit var databaseRef: DatabaseReference
     private lateinit var gejalaList: MutableList<String>
     private lateinit var diagnosisCalculator: DiagnosisCalculator
@@ -26,23 +31,36 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
         setContentView(R.layout.activity_symptom)
 
         listView = findViewById(R.id.list_gejala)
-        databaseRef = FirebaseDatabase.getInstance().reference.child("GEJALA")
+        databaseRef = FirebaseDatabase.getInstance().reference
         gejalaList = mutableListOf()
-        diagnosisCalculator = DiagnosisCalculator(databaseRef)
+        diagnosisCalculator = DiagnosisCalculator(applicationContext, databaseRef)
+        db = Room.databaseBuilder(applicationContext, AppDatabase::class.java, "diagnosis_db").build()
+
+        // Menetapkan instance 'db' ke 'diagnosisCalculator'
+        diagnosisCalculator.db = db
 
         val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_multiple_choice, gejalaList)
         listView.choiceMode = ListView.CHOICE_MODE_MULTIPLE
         listView.adapter = adapter
 
         fetchGejalaData()
+        fetchPenyakitData()
     }
-
     private fun fetchGejalaData() {
-        databaseRef.addValueEventListener(object : ValueEventListener {
+        databaseRef.child("GEJALA").addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 for (gejalaSnapshot in snapshot.children) {
+                    val kodeGejala = gejalaSnapshot.child("kode_gejala").getValue(String::class.java)
                     val gejala = gejalaSnapshot.child("gejala").getValue(String::class.java)
-                    gejala?.let { gejalaList.add(it) }
+                    val bobot = gejalaSnapshot.child("bobot").getValue(Double::class.java)
+
+                    if (kodeGejala != null && gejala != null && bobot != null) {
+                        val gejalaObj = Gejala(kodeGejala, gejala, bobot)
+                        gejalaList.add(gejala)
+                        launch(Dispatchers.IO) {
+                            db.gejalaDao().insertGejala(gejalaObj)
+                        }
+                    }
                 }
                 (listView.adapter as ArrayAdapter<*>).notifyDataSetChanged()
             }
@@ -53,7 +71,35 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
         })
     }
 
-    fun onButtonClick(view: View) = launch {
+    private fun fetchPenyakitData() {
+        databaseRef.child("PENYAKIT").addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                for (gejalaSnapshot in snapshot.children) {
+                    val kodePenyakit = gejalaSnapshot.child("kode_penyakit").getValue(String::class.java)
+                    val namaPenyakit = gejalaSnapshot.child("nama_penyakit").getValue(String::class.java)
+                    val daftarGejala = gejalaSnapshot.child("daftar_gejala").getValue(object : GenericTypeIndicator<List<String>>() {})
+
+                    if (kodePenyakit != null && namaPenyakit != null && daftarGejala != null) {
+                        val penyakitObj = Penyakit(kodePenyakit, namaPenyakit, daftarGejala)
+                        launch(Dispatchers.IO) {
+                            db.penyakitDao().insertPenyakit(penyakitObj)
+                        }
+                    }
+                }
+                (listView.adapter as ArrayAdapter<*>).notifyDataSetChanged()
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                // Handle database error
+            }
+        })
+    }
+
+
+    fun onButtonClick(view: View) {
+        // Jika perhitungan sedang berjalan, jangan mulai perhitungan baru
+        if (isCalculating) return
+
         val selectedGejala = mutableListOf<String>()
         val checkedItems = listView.checkedItemPositions
         for (i in 0 until checkedItems.size()) {
@@ -64,21 +110,28 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
             }
         }
 
-        diagnosisCalculator.calculate(selectedGejala, this@SymptomActivity)
-    }
+        // Tandai bahwa perhitungan sedang berjalan
+        isCalculating = true
 
-    override fun onDiagnosisComplete(daftarBeliefAkhir: Map<String, Double>) {
+        launch(Dispatchers.Main) {
+            diagnosisCalculator.calculate(selectedGejala, this@SymptomActivity)
+        }
+    }
+    override fun onDiagnosisComplete(namaPenyakit: String, beliefValue: Double) {
+        // Menandai bahwa perhitungan telah selesai
+        isCalculating = false
+
         // Menampilkan hasil diagnosis
         launch {
-            var hasilDiagnosis = ""
-            for (kode_penyakit in daftarBeliefAkhir.keys) {
-                if (daftarBeliefAkhir[kode_penyakit]!! >= 0.5) {
-                    hasilDiagnosis += "${diagnosisCalculator.getNamaPenyakit(kode_penyakit)} (${daftarBeliefAkhir[kode_penyakit]})\n"
-                    Log.d(TAG, "onDiagnosisComplete1: $hasilDiagnosis")
-                }
-            }
-            Toast.makeText(this@SymptomActivity, hasilDiagnosis, Toast.LENGTH_LONG).show()
-            Log.d(TAG, "onDiagnosisComplete2: $hasilDiagnosis")
+            val hasilDiagnosisList = mutableListOf<String>()
+
+            hasilDiagnosisList.add("$namaPenyakit (${beliefValue})")
+            Log.d(TAG, "onDiagnosisComplete1: $hasilDiagnosisList")
+
+            val intent = Intent(this@SymptomActivity, ResultActivity::class.java)
+            intent.putExtra("hasil_diagnosis", hasilDiagnosisList.joinToString(separator = "\n"))
+            startActivity(intent)
+            Log.d(TAG, "onDiagnosisComplete2: $hasilDiagnosisList")
         }
     }
 
