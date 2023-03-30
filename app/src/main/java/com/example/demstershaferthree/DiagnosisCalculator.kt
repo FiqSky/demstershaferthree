@@ -1,7 +1,9 @@
 package com.example.demstershaferthree
 
 import android.content.ContentValues.TAG
+import android.content.Context
 import android.util.Log
+import androidx.room.Room
 import com.example.demstershaferthree.db.AppDatabase
 import com.example.demstershaferthree.helper.DiagnosisListener
 import com.google.firebase.database.*
@@ -10,10 +12,10 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class DiagnosisCalculator(private val databaseRef: DatabaseReference) : CoroutineScope by MainScope() {
+class DiagnosisCalculator(private val context: Context, private val databaseRef: DatabaseReference) : CoroutineScope by MainScope() {
     lateinit var db: AppDatabase
-
     fun calculate(selectedGejala: List<String>, callback: DiagnosisListener) {
+        db = Room.databaseBuilder(context, AppDatabase::class.java, "diagnosis_db").build()
         Log.d(TAG, "calculateselectedGejala: $selectedGejala")
         val daftarPenyakit = mutableListOf<String>()
 

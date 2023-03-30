@@ -33,7 +33,7 @@ class SymptomActivity : AppCompatActivity(), DiagnosisListener, CoroutineScope b
         listView = findViewById(R.id.list_gejala)
         databaseRef = FirebaseDatabase.getInstance().reference
         gejalaList = mutableListOf()
-        diagnosisCalculator = DiagnosisCalculator(databaseRef)
+        diagnosisCalculator = DiagnosisCalculator(applicationContext, databaseRef)
         db = Room.databaseBuilder(applicationContext, AppDatabase::class.java, "diagnosis_db").build()
 
         // Menetapkan instance 'db' ke 'diagnosisCalculator'
