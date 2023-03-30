@@ -1,62 +1,64 @@
 package com.example.demstershaferthree
 
 import android.content.ContentValues.TAG
+import android.content.Context
 import android.util.Log
+import androidx.room.Room
+import com.example.demstershaferthree.db.AppDatabase
+import com.example.demstershaferthree.helper.DiagnosisListener
 import com.google.firebase.database.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class DiagnosisCalculator(private val databaseRef: DatabaseReference) {
-
+class DiagnosisCalculator(private val context: Context, private val databaseRef: DatabaseReference) : CoroutineScope by MainScope() {
+    lateinit var db: AppDatabase
     fun calculate(selectedGejala: List<String>, callback: DiagnosisListener) {
-        // Inisialisasi variabel
+        db = Room.databaseBuilder(context, AppDatabase::class.java, "diagnosis_db").build()
+        Log.d(TAG, "calculateselectedGejala: $selectedGejala")
         val daftarPenyakit = mutableListOf<String>()
-        val daftarBelief = mutableMapOf<String, Double>()
 
-        // Looping untuk mendapatkan daftar penyakit dan faktor keyakinannya
         databaseRef.child("PENYAKIT").addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                GlobalScope.launch {
+                launch {
                     snapshot.children.forEach { penyakitSnapshot ->
                         val kode_penyakit = penyakitSnapshot.child("kode_penyakit").getValue(String::class.java)
-                        val daftar_gejala = penyakitSnapshot.child("daftar_gejala").getValue(object : GenericTypeIndicator<List<String>>() {})
-                        var belief = 1.0
-                        selectedGejala.forEach { gejala ->
-                            val bobot = getBobotGejala(gejala)
-                            if (daftar_gejala?.contains(getKodeGejala(gejala)) == true) {
-                                belief *= bobot
-                            } else {
-                                belief *= (1 - bobot)
-                            }
-                        }
+                        Log.d(TAG, "onDataChange: $kode_penyakit")
                         daftarPenyakit.add(kode_penyakit!!)
-                        daftarBelief[kode_penyakit] = belief
-
-                        // Check if all beliefs have been calculated
-                        if (daftarBelief.size == daftarPenyakit.size) {
-                            // Menghitung faktor keyakinan total
-                            var beliefTotal = 0.0
-                            daftarBelief.values.forEach { belief ->
-                                beliefTotal += belief
-                            }
-
-                            // Menghitung faktor keyakinan akhir
-                            val daftarBeliefAkhir = mutableMapOf<String, Double>()
-                            daftarPenyakit.forEach { kode_penyakit ->
-                                val beliefAkhir = daftarBelief[kode_penyakit]!! / (beliefTotal - daftarBelief[kode_penyakit]!!)
-                                daftarBeliefAkhir[kode_penyakit] = beliefAkhir
-                            }
-
-                            // Memanggil callback listener dengan hasil diagnosis
-                            withContext(Dispatchers.Main) {
-                                callback.onDiagnosisComplete(daftarBeliefAkhir)
-                            }
-                            Log.d(TAG, "onDaftarBeliefAkhir: $daftarBeliefAkhir")
-                        }
                     }
+
+                    // Langkah 2: Buat mass functions awal untuk setiap penyakit
+                    val dempsterShafer = DempsterShafer()
+                    val gejalaMassFunctionsList = mutableListOf<Map<String, Double>>()
+                    selectedGejala.forEach { gejala ->
+                        val bobot = getBobotGejala(gejala)
+                        Log.d(TAG, "onDataChange - CheckBobot: $bobot")
+                        val kodeGejala = getKodeGejala(gejala)
+                        val gejalaMassFunctions = getGejalaMassFunctions(kodeGejala, bobot)
+                        Log.d(TAG, "onDataChange - CheckGejalaMassFunctions: $gejalaMassFunctions")
+                        gejalaMassFunctionsList.add(gejalaMassFunctions)
+                        Log.d(TAG, "onDataChange - CheckGejalaMassFunctionsList: $gejalaMassFunctionsList")
+                    }
+
+                    // Langkah 3: Gunakan aturan kombinasi Dempster-Shafer untuk menggabungkan mass functions
+                    var combinedMassFunctions = dempsterShafer.initializeMassFunctions(selectedGejala)
+                    Log.d(TAG, "onDataChange - CheckSelectedGejala: $selectedGejala")
+                    Log.d(TAG, "onDataChange - CheckDaftarPenyakit: $daftarPenyakit")
+                    gejalaMassFunctionsList.forEach { gejalaMassFunctions ->
+                        Log.d(TAG, "onDataChange - CheckGejalaMassFunctions: $gejalaMassFunctions")
+                        combinedMassFunctions = dempsterShafer.combineMassFunctions(daftarPenyakit, combinedMassFunctions, gejalaMassFunctions)
+                        Log.d(TAG, "onDataChange - CheckCombinedMassFunctionsAfterCombination: $combinedMassFunctions")
+                    }
+
+                    // Menemukan penyakit dengan nilai belief tertinggi
+                    val (namaPenyakitTerbaik, beliefTerbaik) = getBestDiagnosisResult(daftarPenyakit, combinedMassFunctions)
+
+                    // Memanggil callback listener dengan hasil diagnosis
+                    withContext(Dispatchers.Main) {
+                        callback.onDiagnosisComplete(namaPenyakitTerbaik, beliefTerbaik)
+                    }
+                    Log.d(TAG, "onDaftarBeliefAkhir: $combinedMassFunctions")
                 }
             }
 
@@ -67,67 +69,47 @@ class DiagnosisCalculator(private val databaseRef: DatabaseReference) {
         })
     }
 
-    // Fungsi untuk mendapatkan bobot gejala dari Firebase Realtime Database
-    private suspend fun getBobotGejala(namaGejala: String): Double = suspendCoroutine { continuation ->
-        databaseRef.child("GEJALA").orderByChild("gejala").equalTo(namaGejala)
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    var bobot = 0.0
-                    if (snapshot.exists()) {
-                        for (gejalaSnapshot in snapshot.children) {
-                            bobot = gejalaSnapshot.child("bobot").getValue(Double::class.java) ?: 0.0
-                        }
-                    }
-                    continuation.resume(bobot)
-                }
+    // Fungsi untuk mendapatkan mass functions gejala
+    private fun getGejalaMassFunctions(gejala: String, bobot: Double): Map<String, Double> {
+        val massFunctions = mutableMapOf<String, Double>()
+        massFunctions[gejala] = bobot
+        massFunctions[""] = 1 - bobot // Himpunan kosong
+        return massFunctions
+    }
 
-                override fun onCancelled(error: DatabaseError) {
-                    continuation.resumeWithException(error.toException())
-                }
-            })
+    // Fungsi untuk mendapatkan hasil diagnosis terbaik (penyakit dengan belief tertinggi)
+    private suspend fun getBestDiagnosisResult(daftarPenyakit: List<String>, combinedMassFunctions: Map<String, Double>): Pair<String, Double> {
+        var namaPenyakitTerbaik = ""
+        var beliefTerbaik = -1.0
+
+        for (kodePenyakit in daftarPenyakit) {
+            val belief = combinedMassFunctions[kodePenyakit] ?: 0.0
+            if (belief > beliefTerbaik) {
+                beliefTerbaik = belief
+                namaPenyakitTerbaik = getNamaPenyakit(kodePenyakit)
+            }
+        }
+
+        return namaPenyakitTerbaik to beliefTerbaik
+    }
+
+    // Fungsi untuk mendapatkan bobot gejala dari Firebase Realtime Database
+    private suspend fun getBobotGejala(namaGejala: String): Double = withContext(Dispatchers.IO) {
+        val gejala = db.gejalaDao().getGejalaByNama(namaGejala)
+        gejala?.bobot ?: 0.0
     }
 
     // Fungsi untuk mendapatkan kode gejala dari Firebase Realtime Database
-    private suspend fun getKodeGejala(namaGejala: String): String = suspendCoroutine { continuation ->
-        databaseRef.child("GEJALA").orderByChild("gejala").equalTo(namaGejala)
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    var kode = ""
-                    if (snapshot.exists()) {
-                        for (gejalaSnapshot in snapshot.children) {
-                            kode = gejalaSnapshot.child("kode_gejala").getValue(String::class.java) ?: ""
-                        }
-                    }
-                    continuation.resume(kode)
-                }
-
-                override fun onCancelled(error: DatabaseError) {
-                    continuation.resumeWithException(error.toException())
-                }
-            })
+    private suspend fun getKodeGejala(namaGejala: String): String {
+        return withContext(Dispatchers.IO) {
+            val gejala = db.gejalaDao().getGejalaByNama(namaGejala)
+            gejala?.kodeGejala ?: ""
+        }
     }
 
-
     // Fungsi untuk mendapatkan nama penyakit dari Firebase Realtime Database
-    suspend fun getNamaPenyakit(kodePenyakit: String): String {
-        return suspendCoroutine { continuation ->
-            databaseRef.child("PENYAKIT").orderByChild("kode_penyakit").equalTo(kodePenyakit)
-                .addListenerForSingleValueEvent(object : ValueEventListener {
-                    override fun onDataChange(snapshot: DataSnapshot) {
-                        if (snapshot.exists()) {
-                            for (penyakitSnapshot in snapshot.children) {
-                                val nama = penyakitSnapshot.child("nama_penyakit").getValue(String::class.java) ?: ""
-                                continuation.resume(nama)
-                            }
-                        } else {
-                            continuation.resumeWithException(Exception("Penyakit tidak ditemukan"))
-                        }
-                    }
-
-                    override fun onCancelled(error: DatabaseError) {
-                        continuation.resumeWithException(error.toException())
-                    }
-                })
-        }
+    suspend fun getNamaPenyakit(kodePenyakit: String): String = withContext(Dispatchers.IO) {
+        val penyakit = db.penyakitDao().getPenyakitByKode(kodePenyakit)
+        penyakit?.namaPenyakit ?: ""
     }
 }
